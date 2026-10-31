@@ -189,12 +189,16 @@ void GLES2Renderer::addSprite(
             cocos2d::CCPoint up = { transform.c * crop.size.height, transform.d * crop.size.height };
 
             if (sprite->isFlipX()) {
-                origin = origin + right;
-                right = -right;
+                origin.x += right.x;
+                origin.y += right.y;
+                right.x = -right.x;
+                right.y = -right.y;
             }
             if (sprite->isFlipY()) {
-                origin = origin + up;
-                up = -up;
+                origin.x += up.x;
+                origin.y += up.y;
+                up.x = -up.x;
+                up.y = -up.y;
             }
 
             float csf = cocos2d::CCDirector::get()->getContentScaleFactor();
@@ -217,13 +221,16 @@ void GLES2Renderer::addSprite(
             }
 
             cocos2d::CCPoint uvFactor = { csf / tw, csf / th };
-            uvBottomLeft = { uvBottomLeft.x * uvFactor.x, uvBottomLeft.y * uvFactor.y };
-            uvRight = { uvRight.x * uvFactor.x, uvRight.y * uvFactor.y };
-            uvUp = { uvUp.x * uvFactor.x, uvUp.y * uvFactor.y };
+            uvBottomLeft.x *= uvFactor.x;
+            uvBottomLeft.y *= uvFactor.y;
+            uvRight.x *= uvFactor.x;
+            uvRight.y *= uvFactor.y;
+            uvUp.x *= uvFactor.x;
+            uvUp.y *= uvFactor.y;
 
             if (m_flipUv) {
                 uvBottomLeft.y = 1.f - uvBottomLeft.y;
-                uvUp = { uvUp.x, -uvUp.y };
+                uvUp.y = -uvUp.y;
             }
 
             ccColor3B color = sprite->getColor();
@@ -239,9 +246,9 @@ void GLES2Renderer::addSprite(
             quad.a = opacity;
 
             // BL, BR, TL, TR
-            cocos2d::CCPoint br = origin + right;
-            cocos2d::CCPoint tl = origin + up;
-            cocos2d::CCPoint tr = br + up;
+            cocos2d::CCPoint br = { origin.x + right.x, origin.y + right.y };
+            cocos2d::CCPoint tl = { origin.x + up.x, origin.y + up.y };
+            cocos2d::CCPoint tr = { br.x + up.x, br.y + up.y };
 
             quad.x[0] = origin.x; quad.y[0] = origin.y;
             quad.x[1] = br.x;     quad.y[1] = br.y;

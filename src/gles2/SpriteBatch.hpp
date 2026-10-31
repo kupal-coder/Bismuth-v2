@@ -3,9 +3,17 @@
 #include <Geode/Geode.hpp>
 #include <Geode/cocos/platform/CCGL.h>
 #include "GLES2Shader.hpp"
+#include <cstdint>
+#include <cstddef>
 #include <vector>
 
 namespace bismuth::gles2 {
+
+// Local aliases: src/common.hpp (the desktop build's type header) is excluded
+// from Android builds since it pulls in the GL 4.3 loader.
+using u8 = std::uint8_t;
+using u32 = std::uint32_t;
+using usize = std::size_t;
 
 // One baked sprite quad. Positions are in m_objectLayer space, UVs are normalised.
 struct SpriteQuad {
