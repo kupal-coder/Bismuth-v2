@@ -210,14 +210,14 @@ void GLES2Renderer::addSprite(
             cocos2d::CCPoint uvUp;
 
             if (!sprite->isTextureRectRotated()) {
-                uvBottomLeft = { crop.origin.x, crop.origin.y + crop.size.height };
-                uvRight = { crop.size.width, 0.f };
-                uvUp = { 0.f, -crop.size.height };
+                uvBottomLeft.setPoint(crop.origin.x, crop.origin.y + crop.size.height);
+                uvRight.setPoint(crop.size.width, 0.f);
+                uvUp.setPoint(0.f, -crop.size.height);
             }
             else {
-                uvBottomLeft = { crop.origin.x, crop.origin.y };
-                uvRight = { 0.f, crop.size.width };
-                uvUp = { crop.size.height, 0.f };
+                uvBottomLeft.setPoint(crop.origin.x, crop.origin.y);
+                uvRight.setPoint(0.f, crop.size.width);
+                uvUp.setPoint(crop.size.height, 0.f);
             }
 
             cocos2d::CCPoint uvFactor = { csf / tw, csf / th };
