@@ -22,6 +22,17 @@ endif()
 # Add all source files inside src (recursively)
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
 
+# The desktop renderer needs OpenGL 4.3 (compute shaders, SSBOs, SPIR-V
+# specialization). GD on Android creates an ES2 context, so none of that can
+# exist there. Android builds use the GLES2 sprite batcher in src/gles2 instead.
+if (ANDROID)
+    message(STATUS "Bismuth: Android build - excluding desktop GL 4.3 renderer")
+    list(FILTER SOURCES EXCLUDE REGEX "/src/(renderer|decomp|culling|math)/")
+    list(FILTER SOURCES EXCLUDE REGEX "/src/(gl|cl|profiler|BProfiler|common|ObjectUtils|HotKey|main)\\.cpp$")
+else()
+    list(FILTER SOURCES EXCLUDE REGEX "/src/gles2/")
+endif()
+
 # Set up the mod binary
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
@@ -35,6 +46,7 @@ set(ENABLE_GLSLANG_BINARIES OFF)
 
 include(FetchContent)
 
+if (NOT ANDROID)
 FetchContent_Declare(
 	glm
 	GIT_REPOSITORY	https://github.com/g-truc/glm.git
@@ -48,8 +60,11 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(glm glslang OpenCL-Headers)
+endif()
 
+if (NOT ANDROID)
 target_link_libraries(${PROJECT_NAME} glm::glm glslang::glslang OpenCL::Headers)
+endif()
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 
 # Other Geode stuff
