@@ -15,6 +15,19 @@
 #include <memory>
 #include <stdint.h>
 
+namespace bismuth {
+/*
+    True when the mod is allowed to do anything at all ("enabled" setting).
+
+    Every hook body checks this first, so a user can turn Bismuth off in its
+    settings, restart, and get a build that is installed but completely inert -
+    which is how we tell whether a crash has anything to do with this mod
+    without having to uninstall it. Read once, so toggling the setting needs a
+    restart.
+*/
+bool modEnabled();
+}
+
 #define MOVE_TRIGGER_ID   901
 #define ALPHA_TRIGGER_ID  1007
 #define TOGGLE_TRIGGER_ID 1049

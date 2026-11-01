@@ -14,6 +14,9 @@ static std::unordered_map<CCSprite*, CCSpriteFrame*> spriteFramesOfSprites;
 #include <Geode/modify/CCSprite.hpp>
 class $modify(SpriteMeshDictionaryCCSprite, CCSprite) {
     bool initWithSpriteFrame(CCSpriteFrame* frame) {
+        if (!bismuth::modEnabled())
+            return CCSprite::initWithSpriteFrame(frame);
+
         if (CCSprite::initWithSpriteFrame(frame)) {
             spriteFramesOfSprites[this] = frame;
             return true;
@@ -22,6 +25,9 @@ class $modify(SpriteMeshDictionaryCCSprite, CCSprite) {
     }
 
     ~SpriteMeshDictionaryCCSprite() {
+        if (!bismuth::modEnabled())
+            return;
+
         spriteFramesOfSprites.erase(this);
     }
 };

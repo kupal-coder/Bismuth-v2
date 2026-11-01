@@ -20,11 +20,11 @@ static bool newPlayLayer = false;
     behaviour, where Renderer::init() reports the problem itself.
 */
 static bool shouldCreateRenderer() {
+    if (!bismuth::modEnabled())
+        return false;
+
     if (!bismuth::isMobilePlatform())
         return true;
-
-    if (!Mod::get()->getSettingValue<bool>("enabled"))
-        return false;
 
     if (!Mod::get()->getSettingValue<bool>("mobile_renderer"))
         return false;
@@ -415,6 +415,10 @@ public:
 class $modify(MyLoadingLayer, LoadingLayer) {
     void loadAssets() {
         LoadingLayer::loadAssets();
+
+        if (!bismuth::modEnabled())
+            return;
+
         if (m_loadStep == 14 && !m_fromRefresh && !hasAlreadyDoneMenuLoad) {
             hasAlreadyDoneMenuLoad = true;
             menuLoad = new OnMenuLoad;

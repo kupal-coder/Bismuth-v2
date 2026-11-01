@@ -33,7 +33,8 @@
 		"enabled": {
 			"name": "Bismuth enabled",
 			"type": "bool",
-			"default": true
+			"default": true,
+			"description": "Turns every part of Bismuth off. Restart the game after changing this: a disabled Bismuth still loads its hooks but they all pass straight through to Geometry Dash, which makes it easy to check whether a crash has anything to do with this mod."
 		},
 		"gpu_core_count": {
 			"name": "GPU core count",
@@ -49,7 +50,6 @@
 			"default": false,
 			"description": "Allows you to enable and disable Bismuth while playing by pressing F8. It also allows you to use Difference Mode by pressing F9 (Difference Mode is very unstable).\n\n WARNING: This option effectively removes any optimization."
 		},
-		
 		"mobile_renderer": {
 			"name": "Enable renderer on mobile",
 			"type": "bool",

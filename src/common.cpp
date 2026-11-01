@@ -6,6 +6,11 @@ using namespace geode::prelude;
 
 std::chrono::steady_clock::time_point modStartTime;
 
+bool bismuth::modEnabled() {
+    static const bool enabled = Mod::get()->getSettingValue<bool>("enabled");
+    return enabled;
+}
+
 $on_mod(Loaded) {
     modStartTime = std::chrono::high_resolution_clock::now();
 }
