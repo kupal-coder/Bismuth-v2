@@ -277,8 +277,8 @@ static bool isShaderSuccessOrPrintError(u32 shader, i32 type) {
     i32 success;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
     if (!success) {
-        char log[512];
-        glGetShaderInfoLog(shader, 512, NULL, log);
+        char log[1024] = {};
+        glGetShaderInfoLog(shader, sizeof(log) - 1, NULL, log);
         const char* shaderType;
         switch (type) {
         case GL_VERTEX_SHADER: shaderType = "vertex"; break;
@@ -315,8 +315,8 @@ static u32 createShaderProgram(const std::vector<u32>& shaders) {
     int success;
     glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (!success) {
-        char log[512];
-        glGetProgramInfoLog(program, 512, NULL, log);
+        char log[1024] = {};
+        glGetProgramInfoLog(program, sizeof(log) - 1, NULL, log);
         log::error("Failed to link shader program:");
         printErrorLog(log);
         glDeleteProgram(program);

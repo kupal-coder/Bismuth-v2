@@ -10,6 +10,28 @@ using namespace geode::prelude;
 static bool newPlayLayer = false;
 // static CCArray* allGameObjects = nullptr;
 
+/*
+    Decides whether it is even worth constructing the renderer node.
+
+    On mobile this can be false for the whole session (the game runs in an ES 2.0
+    context, `mobile_renderer` is off, ...). Checking it before the renderer is
+    created keeps the fallback path completely inert: no node, no GL state, no
+    notifications created from inside PlayLayer::init. Desktop keeps the old
+    behaviour, where Renderer::init() reports the problem itself.
+*/
+static bool shouldCreateRenderer() {
+    if (!bismuth::isMobilePlatform())
+        return true;
+
+    if (!Mod::get()->getSettingValue<bool>("enabled"))
+        return false;
+
+    if (!Mod::get()->getSettingValue<bool>("mobile_renderer"))
+        return false;
+
+    return bismuth::glCapabilities().canRender();
+}
+
 #include <Geode/modify/PlayLayer.hpp>
 class $modify(RendererPlayLayer, PlayLayer) {
     void setupHasCompleted() {
@@ -35,9 +57,19 @@ class $modify(RendererPlayLayer, PlayLayer) {
                 return;
             }
 
-            auto renderer = Renderer::create(this, m_objects);
-            if (renderer)
-                batchLayer->addChild(renderer, -100000);
+            if (shouldCreateRenderer()) {
+                auto renderer = Renderer::create(this, m_objects);
+                if (renderer)
+                    batchLayer->addChild(renderer, -100000);
+            }
+            else {
+                log::info(
+                    "Not starting the renderer on this device ({}), Geometry Dash keeps its own renderer",
+                    bismuth::glCapabilities().canRender()
+                        ? "disabled in the settings"
+                        : "OpenGL ES 3.1 is not available"
+                );
+            }
         }
 
         auto renderer = Renderer::get();
