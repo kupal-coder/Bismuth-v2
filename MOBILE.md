@@ -124,6 +124,16 @@ geode build                 # current platform
 # or via CI: .github/workflows/multi-platform.yml builds Windows, Android32 and Android64
 ```
 
+The CI workflow is the reference build: Windows (Win64), Android32 (armeabi-v7a)
+and Android64 (arm64-v8a) all compile against Geode SDK 5.10.1 with the NDK
+clang, and the `Package builds` job merges the three `.geode` files into one
+artifact. A manual-only helper, `.github/workflows/diagnose.yml`, runs the same
+configure/build commands on demand and commits the filtered compiler output to
+`.ci/reports/` so failures can be inspected without downloading Actions logs
+(downloading them is not possible from every environment). It only runs on
+`workflow_dispatch` or when `.ci/diagnose-trigger` changes, so it can simply be
+deleted if it is not wanted.
+
 `CMakeLists.txt` only fetches glslang and the OpenCL headers on desktop; mobile
 builds link the NDK's GLES headers and nothing else.
 
