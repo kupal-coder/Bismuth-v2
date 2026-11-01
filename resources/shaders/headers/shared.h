@@ -91,17 +91,39 @@ mat2 scaleMatrix(float scale) {
     );
 }
 
-#define BITMAP_GET(B, I) ( ( (B)[(I) >> 5] >> ((I) & 0x1f) ) & 1 )
+#define BITMAP_GET(B, I) ( ( (B)[(I) >> 5u] >> ((I) & 0x1fu) ) & 1u )
 
-#define GET_LOW16(V)  ( (V)       & 0xffff )
-#define GET_HIGH16(V) ( (V >> 16) & 0xffff )
+#define GET_LOW16(V)  ( (V)       & 0xffffu )
+#define GET_HIGH16(V) ( (V >> 16u) & 0xffffu )
 
 #define GLSL_ONLY(D) D
 #define CPP_ONLY(D)
 
+/*
+    unpackUnorm4x8 is GLSL 4.0+ only. GLSL ES 3.10 does not have it, so provide
+    an equivalent there (same component order: low byte is the first component).
+*/
+vec4 bismuthUnpackRGBA(uint packed) {
+#ifdef BISMUTH_GLSL_ES
+    return vec4(
+        float( (packed      ) & 0xFFu),
+        float( (packed >>  8) & 0xFFu),
+        float( (packed >> 16) & 0xFFu),
+        float( (packed >> 24) & 0xFFu)
+    ) / 255.0;
+#else
+    return unpackUnorm4x8(packed);
+#endif
+}
+
 #define UNIFORM_BUFFER(BindingId_) layout (std140, binding = BindingId_) uniform
 #define STORAGE_BUFFER(BindingId_) layout (std430, binding = BindingId_) buffer
 
+/*
+    Note: this macro relies on token pasting (##), which GLSL ES does not
+    support. ES builds declare the split buffers by hand below instead.
+*/
+#ifndef BISMUTH_GLSL_ES
 #define _SAO_VARS_AS_BUFFERS(BufferName_, Binding_, Type_, Name_) \
     layout (std430, binding = Binding_) buffer Buffer_##BufferName_##_##Name_ { \
         Type_ BufferName_##_##Name_[]; \
@@ -109,6 +131,7 @@ mat2 scaleMatrix(float scale) {
 
 #define SAO_BUFFER(Vars_, Name_) \
     Vars_(Name_, _SAO_VARS_AS_BUFFERS)
+#endif
 
 #endif // GLSL
 
@@ -141,13 +164,34 @@ mat2 scaleMatrix(float scale) {
     
 #define PULSE_ENTRY_BUFFER_BINDING 16
 
+#ifdef BISMUTH_GLSL_ES
+// Same blocks the SAO_BUFFER macro produces on desktop, spelled out because
+// GLSL ES has no token pasting.
+layout (std430, binding = 11) buffer Buffer_PreCulledSprite_startPosition {
+    vec2 PreCulledSprite_startPosition[];
+};
+layout (std430, binding = 12) buffer Buffer_PreCulledSprite_groupCombinationIndex {
+    uint PreCulledSprite_groupCombinationIndex[];
+};
+
+layout (std430, binding = 13) buffer Buffer_RawSprite_color {
+    vec4 RawSprite_color[];
+};
+layout (std430, binding = 14) buffer Buffer_RawSprite_position {
+    vec2 RawSprite_position[];
+};
+layout (std430, binding = 15) buffer Buffer_RawSprite_localTransform {
+    mat2 RawSprite_localTransform[];
+};
+#else
 SAO_BUFFER(RAW_SPRITE, RawSprite)
 SAO_BUFFER(PRE_CULLED_SPRITE, PreCulledSprite)
+#endif
 
 struct ObjectVertex {
     vec2 positionOffset;
     vec2 texCoord;
-    int  spriteIndex;
+    uint spriteIndex;
 };
 
 STORAGE_BUFFER(CULLED_TRI_INDEX_BUFFER) CulledTriIndexBuffer {

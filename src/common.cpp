@@ -19,16 +19,8 @@ std::string byteSizeToString(usize size) {
 }
 
 bool isOpenGLAtLeastVersion(u32 major, u32 minor) {
-    std::string version = (const char*)glGetString(GL_VERSION);
-    if (version.starts_with("OpenGL ES"))
-        return false;
-
-    auto rawVersion = version.substr(0, version.find_first_of(' '));
-    auto ver = VersionInfo::parse(rawVersion);
-    if (!ver)
-        return false;
-
-    return VersionInfo(major, minor, 0) <= ver.unwrap();
+    // Handles both desktop ("4.6.0 NVIDIA ...") and ES ("OpenGL ES 3.2 ...").
+    return bismuth::glCapabilities().isAtLeast((int)major, (int)minor);
 }
 
 using ProcGlObjectLabel = void(*)(GLenum, GLuint, GLsizei, const char*);
@@ -36,12 +28,16 @@ using ProcGlObjectLabel = void(*)(GLenum, GLuint, GLsizei, const char*);
 ProcGlObjectLabel glObjectLabelProc = nullptr;
 
 void glObjectLabel(GLenum id, GLuint name, GLsizei length, const char* label) {
-    #ifdef GEODE_WINDOWS
+#if BISMUTH_GL_ES
+    // KHR_debug; a no-op on drivers that do not expose debug annotations.
+    if (bgl::gl.ObjectLabel)
+        bgl::gl.ObjectLabel(id, name, length, label);
+#elif defined(GEODE_IS_WINDOWS)
     if (!glObjectLabelProc)
         glObjectLabelProc = (ProcGlObjectLabel)wglGetProcAddress("glObjectLabel");
     if (glObjectLabelProc)
         glObjectLabelProc(id, name, length, label);
-    #endif
+#endif
 }
 
 static float fullscreenQuad[] = {
@@ -57,6 +53,12 @@ u32 fullscreenQuadVAO = 0;
 UPtr<Buffer> fullscreenQuadVBO = nullptr;
 
 void drawFullscreenQuad() {
+#if BISMUTH_GL_ES
+    // Not linked on mobile; needs the runtime-resolved entry points.
+    if (!glGenVertexArrays || !glBindVertexArray)
+        return;
+#endif
+
     if (!fullscreenQuadVAO) {
         if (!fullscreenQuadVBO)
             fullscreenQuadVBO = Buffer::createStaticDraw("Fullscreen quad buffer", fullscreenQuad, sizeof(fullscreenQuad));
@@ -75,8 +77,13 @@ void drawFullscreenQuad() {
 #include <geode/modify/CCDirector.hpp>
 class $modify(CommonCCDirector, CCDirector) {
     void purgeDirector() {
+#if BISMUTH_GL_ES
+        if (fullscreenQuadVAO && glDeleteVertexArrays)
+            glDeleteVertexArrays(1, &fullscreenQuadVAO);
+#else
         if (fullscreenQuadVAO)
             glDeleteVertexArrays(1, &fullscreenQuadVAO);
+#endif
         
         fullscreenQuadVAO = 0;
         fullscreenQuadVBO = nullptr;

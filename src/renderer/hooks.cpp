@@ -3,7 +3,7 @@
 #include <decomp/PlayLayer.hpp>
 #include <decomp/GJBaseGameLayer.hpp>
 #include <BProfiler.hpp>
-#include "../cl.hpp"
+#include "../platform/GPUInfo.hpp"
 
 using namespace geode::prelude;
 
@@ -314,8 +314,13 @@ static bool hasAlreadyDoneMenuLoad = false;
 class OnMenuLoad : public CCNode {
 public:
     void showLoadAlerts() {
-        if (!isOpenGLAtLeastVersion(4, 3)) {
-            std::string version = (const char*)glGetString(GL_VERSION);
+        if (!Mod::get()->getSettingValue<bool>("enabled"))
+            return;
+
+        const auto& caps = bismuth::glCapabilities();
+
+        if (!caps.canRender()) {
+            std::string version = caps.version;
             std::transform(version.begin(), version.end(), version.begin(), [](char ch) { return std::tolower(ch); });
 
             if (version.find("reviangle") != std::string::npos) {
@@ -323,6 +328,21 @@ public:
                     "Bismuth error!",
                     "You are using ReviANGLE which does not supply the required OpenGL version 4.3\n"
                     "Disable ReviANGLE and try again.",
+                    "Ok"
+                )->show();
+                return;
+            }
+
+            if (bismuth::isMobilePlatform()) {
+                FLAlertLayer::create(
+                    "Bismuth (mobile)",
+                    fmt::format(
+                        "Bismuth's renderer needs <cy>OpenGL ES 3.1</c> (compute shaders + SSBOs).\n\n"
+                        "This device reports: <cp>{}</c>\n\n"
+                        "Bismuth will stay <cr>disabled</c> and Geometry Dash keeps using its "
+                        "normal renderer. Nothing else changes.",
+                        caps.version.empty() ? "no GL context" : caps.version
+                    ),
                     "Ok"
                 )->show();
                 return;
@@ -337,7 +357,8 @@ public:
             return;
         }
 
-        if (getGPUCoreCount() == -1) {
+        // OpenCL core count detection only exists on Windows.
+        if (!bismuth::isMobilePlatform() && getGPUCoreCount() == -1) {
             FLAlertLayer::create(
                 "No core count!",
                 "Bismuth could not find the core count of your GPU!\n"

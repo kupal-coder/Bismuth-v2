@@ -1,4 +1,4 @@
-#define GAME_STATE_IS_PLAYER_DEAD (1 << 0)
+#define GAME_STATE_IS_PLAYER_DEAD (1u << 0)
 
 /*
     This is the uniform buffer used to store

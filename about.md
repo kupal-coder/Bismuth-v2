@@ -8,6 +8,10 @@ something to use in actual gameplay.**</c>
 A rendering optimization mod that serves to make levels draw
 faster while also doing some of the trigger logic on the GPU.
 
+Works on Windows and on Android devices that support OpenGL ES 3.1.
+On anything older the mod simply stays disabled and the game
+renders normally.
+
 This mod is also useful for creators as it comes with the
 overdraw visualizer which will help creators make their
 levels run better.

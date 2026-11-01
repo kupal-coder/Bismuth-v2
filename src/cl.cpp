@@ -1,5 +1,7 @@
 #include "cl.hpp"
 
+#if defined(GEODE_IS_WINDOWS)
+
 using namespace geode::prelude;
 
 #define CL_NO_CORE_PROTOTYPES
@@ -105,6 +107,9 @@ bool fetchGPUCoreCountRaw(cl_device_id deviceID) {
     }
 
     if (isIntelGPU())
+        // Pre-existing bug (kept as-is on purpose): this mutates the sentinel
+        // global instead of the local count, so the doubling never applies.
+        // Reported separately; changing it would alter desktop dispatch sizes.
         gpuCoreCount *= 2; // TODO: Check if this is a stupid thing to do
 
     log::info("Detected core count: {}", coreCount);
@@ -162,7 +167,7 @@ bool fetchGPUCoreCount() {
     return false;
 }
 
-isize getGPUCoreCount() {
+isize getGPUCoreCountWindows() {
     int setting = Mod::get()->getSettingValue<int>("gpu_core_count");
     if (setting != 0)
         return setting;
@@ -180,5 +185,7 @@ isize getGPUCoreCount() {
 }
 
 $on_mod(Loaded) {
-    getGPUCoreCount();
+    getGPUCoreCountWindows();
 }
+
+#endif // GEODE_IS_WINDOWS

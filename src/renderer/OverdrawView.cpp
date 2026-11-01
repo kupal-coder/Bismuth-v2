@@ -1,8 +1,8 @@
 #include "OverdrawView.hpp"
 #include "Geode/cocos/CCDirector.h"
 #include "Geode/cocos/base_nodes/CCNode.h"
-#include "Geode/cocos/platform/win32/CCEGLView.h"
-#include "Geode/cocos/platform/win32/CCGL.h"
+#include <Geode/cocos/platform/CCEGLView.h>
+#include "platform/GL.hpp"
 #include "Geode/modify/Modify.hpp"
 #include "HotKey.hpp"
 #include "Renderer.hpp"
@@ -67,7 +67,10 @@ void OverdrawView::postdraw() {
     if (!enabled) return;
 
     glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+
+#if BISMUTH_GL_DESKTOP
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+#endif
 }
 
 void OverdrawView::clear() {
@@ -79,7 +82,16 @@ void OverdrawView::clear() {
 
 void OverdrawView::finish() {
     if (!enabled) return;
-    
+
+#if BISMUTH_GL_ES
+    /*
+        The overdraw view reads back the stencil buffer, which OpenGL ES does not
+        expose through glReadPixels. It is a creator debugging tool, so it is
+        simply unavailable on mobile.
+    */
+    return;
+#else
+
     auto currentSize = CCDirector::get()->getOpenGLView()->getWindowedSize();
     stencilBuffer.resize((u32)currentSize.width * (u32)currentSize.height);
 
@@ -127,6 +139,8 @@ void OverdrawView::finish() {
     drawFullscreenQuad();
 
     restoreGLStates();
+#endif
+
 }
 
 std::string OverdrawView::getDebugText() {

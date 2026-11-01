@@ -1,13 +1,13 @@
 #define HSV uint
 
-#define HSV_HUE_BIT  16
-#define HSV_HUE_MASK 0x1ff
-#define HSV_SAT_BIT  8
-#define HSV_SAT_MASK 0xff
-#define HSV_VAL_BIT  0
-#define HSV_VAL_MASK 0xff
-#define HSV_SAT_ADD  0x20000000
-#define HSV_VAL_ADD  0x10000000
+#define HSV_HUE_BIT  16u
+#define HSV_HUE_MASK 0x1ffu
+#define HSV_SAT_BIT  8u
+#define HSV_SAT_MASK 0xffu
+#define HSV_VAL_BIT  0u
+#define HSV_VAL_MASK 0xffu
+#define HSV_SAT_ADD  0x20000000u
+#define HSV_VAL_ADD  0x10000000u
 
 #ifdef GLSL
 
@@ -60,8 +60,8 @@ HSVStruct readHSV(HSV hsvValue) {
     hsv.hue = float(int((hsvValue >> HSV_HUE_BIT) & HSV_HUE_MASK) - 256) / 360.0;
     hsv.sat = float((hsvValue >> HSV_SAT_BIT) & HSV_SAT_MASK) / 127.5;
     hsv.val = float((hsvValue >> HSV_VAL_BIT) & HSV_VAL_MASK) / 127.5;
-    hsv.satAdd = (hsvValue & HSV_SAT_ADD) != 0;
-    hsv.valAdd = (hsvValue & HSV_VAL_ADD) != 0;
+    hsv.satAdd = (hsvValue & HSV_SAT_ADD) != 0u;
+    hsv.valAdd = (hsvValue & HSV_VAL_ADD) != 0u;
 
     if (hsv.satAdd) hsv.sat -= 1.0;
     if (hsv.valAdd) hsv.val -= 1.0;

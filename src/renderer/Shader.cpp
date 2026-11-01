@@ -1,13 +1,19 @@
 #include "Shader.hpp"
-#include "Geode/cocos/platform/win32/CCGL.h"
+#include "platform/GL.hpp"
 #include "common.hpp"
-#include "glslang/MachineIndependent/Versions.h"
+#include "ShaderPreprocessor.hpp"
 
 #include <Geode/Geode.hpp>
 #include <vector>
 
+#if BISMUTH_GL_DESKTOP
+// glslang is only used on desktop. On mobile the shader source goes straight to
+// the driver, preprocessed by ShaderPreprocessor.cpp instead.
+#include "glslang/MachineIndependent/Versions.h"
 #include <glslang/Public/ShaderLang.h>
 #include <SPIRV/GlslangToSpv.h>
+#endif
+
 #include <optional>
 #include <memory>
 
@@ -35,6 +41,8 @@ void printErrorLog(std::string str) {
         log::error("    {}", start);
 }
 
+#if BISMUTH_GL_DESKTOP
+
 /*
     This is the main reason to use glslang. It is
     to use the #include pre-processor.
@@ -53,7 +61,7 @@ public:
     ) override {
         auto res = readResourceFile(headerName);
         if (!res) {
-            geode::log::error("could not include header file at: {}", headerName);
+            log::error("could not include header file at: {}", headerName);
             return nullptr;
         }
 
@@ -177,10 +185,35 @@ static UPtr<glslang::TShader> compileShader(EShLanguage stage, std::string code,
     return shader;
 }
 
+#endif // BISMUTH_GL_DESKTOP
+
+/*
+    Resolves `#include "..."` for the shaders. Geode flattens the mod's resource
+    directory, so a plain name is tried first and then the shader folders.
+*/
+static std::optional<std::string> readShaderInclude(const std::string& name) {
+    static const fs::path searchDirectories[] = {
+        "",
+        "headers",
+        fs::path("shaders") / "headers",
+        "shaders",
+    };
+
+    for (const auto& directory : searchDirectories) {
+        auto content = readResourceFile(directory / name);
+        if (content)
+            return content;
+    }
+
+    return std::nullopt;
+}
+
+#if BISMUTH_GL_DESKTOP
+
 static std::optional<std::string> preprocessShaderFile(const fs::path& path, std::string preCode, EShLanguage stage) {
     auto source = readResourceFile(path);
     if (!source) {
-        geode::log::error("could not find shader at path: {}", path);
+        log::error("could not find shader at path: {}", path);
         return std::nullopt;
     }
     
@@ -199,6 +232,41 @@ static std::optional<std::string> preprocessShaderFile(const fs::path& path, std
     return "#version 460\n" + codeOut;
 }
 
+#else // mobile
+
+/*
+    On OpenGL ES the shader has to be GLSL ES 3.10 and glslang is not available,
+    so the includes / defines / conditional compilation are handled by
+    ShaderPreprocessor and the driver compiles the result directly.
+*/
+static std::optional<std::string> preprocessShaderFileMobile(
+    const fs::path& path,
+    const std::map<std::string, std::string>& macroVariables,
+    shaderpp::Stage stage
+) {
+    auto source = readResourceFile(path);
+    if (!source) {
+        log::error("could not find shader at path: {}", path);
+        return std::nullopt;
+    }
+
+    shaderpp::Options options;
+    options.version = "310 es";
+    options.defines = macroVariables;
+    options.readFile = readShaderInclude;
+
+    std::string error;
+    auto result = shaderpp::preprocess(source.value(), path.string(), stage, options, &error);
+    if (!result) {
+        log::error("failed to preprocess {} shader {}: {}", shaderpp::stageName(stage), path, error);
+        return std::nullopt;
+    }
+
+    return result;
+}
+
+#endif
+
 static bool isShaderSuccessOrPrintError(u32 shader, i32 type) {
     i32 success;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
@@ -210,8 +278,9 @@ static bool isShaderSuccessOrPrintError(u32 shader, i32 type) {
         case GL_VERTEX_SHADER: shaderType = "vertex"; break;
         case GL_FRAGMENT_SHADER: shaderType = "fragment"; break;
         case GL_COMPUTE_SHADER: shaderType = "compute"; break;
+        default: shaderType = "unknown"; break;
         }
-        geode::log::error("failed to compile {} shader:", shaderType);
+        log::error("failed to compile {} shader:", shaderType);
         printErrorLog(log);
         return false;
     }
@@ -242,7 +311,7 @@ static u32 createShaderProgram(const std::vector<u32>& shaders) {
     if (!success) {
         char log[512];
         glGetProgramInfoLog(program, 512, NULL, log);
-        geode::log::error("Failed to link shader program:");
+        log::error("Failed to link shader program:");
         printErrorLog(log);
         glDeleteProgram(program);
         return 0;
@@ -250,6 +319,8 @@ static u32 createShaderProgram(const std::vector<u32>& shaders) {
 
     return program;
 }
+
+#if BISMUTH_GL_DESKTOP
 
 /*
 static u32 createPrecompiledShaderProgram(
@@ -358,41 +429,31 @@ static u32 createPrecompiledShaderProgram(
 }
 */
 
+#endif // BISMUTH_GL_DESKTOP
+
+#if BISMUTH_GL_DESKTOP
 static inline std::string generatePreCode(std::map<std::string, std::string> macroVariables) {
     std::string preCode = "#define GLSL\n";
     for (auto [k, v] : macroVariables)
         preCode += "#define " + k + " " + v + "\n";
     return preCode;
 }
+#endif
 
 UPtr<Shader> Shader::create(
     const fs::path& vertexPath,
     const fs::path& fragmentPath,
     std::map<std::string, std::string> macroVariables
 ) {
+#if BISMUTH_GL_DESKTOP
     auto preCode = generatePreCode(macroVariables);
-
-    /*
-    if (isNVidiaGPU() && isOpenGLAtLeastVersion(4, 6)) {
-        u32 program = createPrecompiledShaderProgram(
-            {
-                {EShLangVertex, vertexPath},
-                {EShLangFragment, fragmentPath}
-            },
-            preCode
-        );
-
-        if (program == 0)
-            return nullptr;
-
-        auto ret = std::make_unique<Shader>();
-        ret->program = program;
-        return ret;
-    }
-    */
 
     auto vertexSource   = preprocessShaderFile(vertexPath, preCode, EShLangVertex);
     auto fragmentSource = preprocessShaderFile(fragmentPath, preCode, EShLangFragment);
+#else
+    auto vertexSource   = preprocessShaderFileMobile(vertexPath, macroVariables, shaderpp::Stage::Vertex);
+    auto fragmentSource = preprocessShaderFileMobile(fragmentPath, macroVariables, shaderpp::Stage::Fragment);
+#endif
 
     if (!vertexSource || !fragmentSource)
         return nullptr;
@@ -420,28 +481,12 @@ UPtr<Shader> Shader::create(
 }
 
 UPtr<Shader> Shader::createCompute(const fs::path& path, std::map<std::string, std::string> macroVariables) {
+#if BISMUTH_GL_DESKTOP
     auto preCode = generatePreCode(macroVariables);
-
-    /*
-    if (isNVidiaGPU() && isOpenGLAtLeastVersion(4, 6)) {
-        u32 program = createPrecompiledShaderProgram(
-            {
-                {EShLangCompute, path}
-            },
-            preCode
-        );
-
-        if (program == 0)
-            return nullptr;
-
-        auto ret = std::make_unique<Shader>();
-        log::info("GroupStateBuffer {}", glGetUniformBlockIndex(program, "GroupStateBuffer"));
-        ret->program = program;
-        return ret;
-    }
-    */
-
     auto source = preprocessShaderFile(path, preCode, EShLangCompute);
+#else
+    auto source = preprocessShaderFileMobile(path, macroVariables, shaderpp::Stage::Compute);
+#endif
     if (!source)
         return nullptr;
 
@@ -560,6 +605,8 @@ void Shader::setTextureArray(u32 location, i32 count, cocos2d::CCTexture2D** tex
     }
 }
 
+#if BISMUTH_GL_DESKTOP
+
 // A bunch of bs required to compile with glslang, idk why
 static TBuiltInResource getDefaultResources() {
     TBuiltInResource resources;
@@ -669,3 +716,5 @@ static TBuiltInResource getDefaultResources() {
 
     return resources;
 }
+
+#endif // BISMUTH_GL_DESKTOP

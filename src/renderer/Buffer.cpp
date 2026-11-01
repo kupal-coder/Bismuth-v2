@@ -12,6 +12,12 @@ void Buffer::read(void* data, usize size, usize offset) {
     assert(data != nullptr);
     assert((offset + size) <= this->size);
 
+#if BISMUTH_GL_ES
+    // Not linked on mobile; resolved at runtime.
+    if (!glGetBufferSubData)
+        return;
+#endif
+
     i32 previouslyBoundBuffer;
     glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &previouslyBoundBuffer);
 
@@ -34,12 +40,35 @@ void Buffer::write(void* data, usize size, usize offset) {
     glBindBuffer(GL_ARRAY_BUFFER, previouslyBoundBuffer);
 }
 
-void* Buffer::map(i32 type) {
+void* Buffer::map(Access access) {
     if (mappedData) return nullptr;
 
     if (shouldMap) {
+#if BISMUTH_GL_ES
+        if (!glMapBufferRange || !glUnmapBuffer) {
+            shouldMap = false;
+            mappedData = new u8[size];
+            return mappedData;
+        }
+#endif
+
         bindAs(GL_ARRAY_BUFFER);
-        mappedData = (u8*)glMapBuffer(GL_ARRAY_BUFFER, type);
+
+        GLbitfield flags = GL_MAP_FLUSH_EXPLICIT_BIT;
+        if (access == Access::ReadWrite)
+            flags |= GL_MAP_READ_BIT | GL_MAP_WRITE_BIT;
+        else
+            flags |= GL_MAP_WRITE_BIT;
+
+        mappedData = (u8*)glMapBufferRange(GL_ARRAY_BUFFER, 0, (GLsizeiptr)size, flags);
+
+        // Some drivers refuse the mapping (e.g. out of memory); fall back to a
+        // shadow copy so the renderer keeps working.
+        if (!mappedData) {
+            log::warn("Failed to map buffer '{}', falling back to a CPU copy", name);
+            shouldMap = false;
+            mappedData = new u8[size];
+        }
     } else {
         mappedData = new u8[size];
     }
@@ -51,10 +80,20 @@ void Buffer::unmap() {
 
     if (shouldMap) {
         bindAs(GL_ARRAY_BUFFER);
+
+        /*
+            The mapping uses GL_MAP_FLUSH_EXPLICIT_BIT, so anything that was not
+            flushed explicitly has undefined contents after unmapping. Flushing
+            the whole range here is cheap and makes the API forgiving.
+        */
+        if (glFlushMappedBufferRange)
+            glFlushMappedBufferRange(GL_ARRAY_BUFFER, 0, (GLsizeiptr)size);
+
         glUnmapBuffer(GL_ARRAY_BUFFER);
     } else {
         delete[] mappedData;
     }
+
     mappedData = nullptr;
 }
 

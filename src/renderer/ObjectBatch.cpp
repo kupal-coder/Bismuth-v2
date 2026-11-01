@@ -258,12 +258,31 @@ void ObjectBatch::draw(const LayerKey& layer) {
     vertexBuffer->bindAsStorageBuffer(VERTEX_BUFFER_BINDING);
     culledIndexBuffer->bindAsStorageBuffer(CULLED_TRI_INDEX_BUFFER);
 
-    glMultiDrawArraysIndirect(
-        GL_TRIANGLES,
-        (void*)(range.offset * sizeof(DrawCommand)),
-        range.count,
-        sizeof(DrawCommand)
-    );
+    const auto& caps = bismuth::glCapabilities();
+
+    if (caps.multiDrawIndirect) {
+        glMultiDrawArraysIndirect(
+            GL_TRIANGLES,
+            (void*)(range.offset * sizeof(DrawCommand)),
+            range.count,
+            sizeof(DrawCommand)
+        );
+    }
+#if BISMUTH_GL_ES
+    else {
+        /*
+            GLES 3.1 only has the single indirect draw call (multi draw is an
+            extension), so fall back to one call per work group. Everything is
+            still driven by the GPU-written command buffer.
+        */
+        for (u32 i = 0; i < range.count; i++) {
+            glDrawArraysIndirect(
+                GL_TRIANGLES,
+                (void*)((range.offset + i) * sizeof(DrawCommand))
+            );
+        }
+    }
+#endif
 
     PROFILER_POP();
 }
@@ -293,6 +312,14 @@ void ObjectBatch::predraw() {
     sortedBatch->bindBuffers();
 
     glDispatchCompute(sortedBatch->workGroupCount, 1, 1);
+
+    /*
+        Make the compute shader's SSBO writes (sprite transforms, culled indices
+        and the indirect draw commands) visible to the vertex shader and to the
+        draw that follows. Desktop drivers tend to get away without this, mobile
+        drivers do not.
+    */
+    bismuth::gpuMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
 
     cullingComputeShaderTimer.stop();
     PROFILER_POP();
@@ -332,12 +359,21 @@ static AttribTypeInfo getInfoOfAttributeTypeString(std::string type) {
 }
 
 static void vertexAttribPointer(u32 id, const AttribTypeInfo& info, usize stride, usize offset) {
-    if (info.openGlType == GL_FLOAT)
+    (void)stride;
+
+    if (info.openGlType == GL_FLOAT) {
         glVertexAttribPointer(id, info.componentCount, info.openGlType, GL_FALSE, sizeof(ObjectVertex), (void*)offset);
-    else if (info.openGlType == GL_DOUBLE)
+        return;
+    }
+
+#if BISMUTH_GL_DESKTOP
+    if (info.openGlType == GL_DOUBLE) {
         glVertexAttribLPointer(id, info.componentCount, info.openGlType, sizeof(ObjectVertex), (void*)offset);
-    else
-        glVertexAttribIPointer(id, info.componentCount, info.openGlType, sizeof(ObjectVertex), (void*)offset);
+        return;
+    }
+#endif
+
+    glVertexAttribIPointer(id, info.componentCount, info.openGlType, sizeof(ObjectVertex), (void*)offset);
 }
 
 #define VERTEX_ATTRIBUTE_AS_ATTRIB_POINTER_CALL(ID, TYPE, NAME) \

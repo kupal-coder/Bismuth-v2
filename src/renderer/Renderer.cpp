@@ -1,7 +1,7 @@
 #include "Renderer.hpp"
 #include "Geode/cocos/CCDirector.h"
 #include "Geode/cocos/kazmath/include/kazmath/mat4.h"
-#include "Geode/cocos/platform/win32/CCGL.h"
+#include "platform/GL.hpp"
 #include "Geode/cocos/robtop/keyboard_dispatcher/CCKeyboardDelegate.h"
 #include "Geode/cocos/sprite_nodes/CCSpriteBatchNode.h"
 #include "GroupManager.hpp"
@@ -54,20 +54,54 @@ bool Renderer::init(PlayLayer* layer, CCArray* levelObjects) {
         return false;
     currentRenderer = this;
     
-    if (!isOpenGLAtLeastVersion(4, 3)) {
-        Notification::create(
-            "Your device doesn't support the required OpenGL 4.3\nPlease update your drivers",
-            NotificationIcon::Error,
-            5.0f
-        )->show();
-        log::error("Device doesn't support OpenGL 4.3. OpenGL Version: {}", (const char*)glGetString(GL_VERSION));
+    if (bismuth::isMobilePlatform() && !Mod::get()->getSettingValue<bool>("mobile_renderer")) {
+        log::info("Mobile renderer disabled in the mod settings, using vanilla rendering");
         return false;
     }
 
-    if (!hasLoadedNewerOpenGLFunctions())
-        loadNewerOpenGLFunctions();
+    const auto& caps = bismuth::glCapabilities();
 
-    glGenQueries(1, &timeElapsedQuery);
+    /*
+        This single check replaces the old "is this OpenGL 4.3?" test. It is what
+        lets the renderer run on OpenGL ES 3.1 devices, and what makes the mod
+        fall back to the vanilla renderer everywhere else (including most mobile
+        contexts, which are still GLES 2.0).
+    */
+    if (!caps.canRender()) {
+        std::string message;
+
+        if (bismuth::isMobilePlatform()) {
+            message = fmt::format(
+                "Bismuth needs OpenGL ES 3.1 (compute shaders + SSBOs).\n"
+                "This session runs on {}.\n",
+                caps.version.empty() ? "an unknown GL version" : caps.version
+            );
+
+            if (caps.version.find("OpenGL ES 2.0") != std::string::npos ||
+                caps.version.find("OpenGL ES 3.0") != std::string::npos) {
+                message +=
+                    "Geometry Dash created an OpenGL ES 2.0/3.0 context, which cannot "
+                    "run Bismuth's shaders.\n";
+            }
+
+            message += "Bismuth stays disabled, the game will render normally.";
+        } else {
+            message = "Your device doesn't support the required OpenGL 4.3\nPlease update your drivers";
+        }
+
+        Notification::create(message, NotificationIcon::Error, 5.0f)->show();
+        log::error(
+            "Renderer unavailable: version '{}' (compute={}, ssbo={}, indirect={})",
+            caps.version.empty() ? "<no context>" : caps.version,
+            caps.computeShaders, caps.storageBuffers, caps.indirectDraw
+        );
+        return false;
+    }
+
+    log::info("Running the renderer on {}", caps.versionString());
+
+    if (caps.gpuTimers)
+        glGenQueries(1, &timeElapsedQuery);
 
     this->layer = layer;
     
@@ -170,14 +204,30 @@ bool Renderer::init(PlayLayer* layer, CCArray* levelObjects) {
 
     log::info("Compiling shaders...");
     shader = Shader::create("objectDrawing.vert", "objectDrawing.frag", shaderMacroVariables);
-    if (!shader)
+    if (!shader) {
+        Notification::create(
+            "Bismuth couldn't compile its shaders on this device.\n"
+            "The game keeps its normal renderer. See Bismuth.log.",
+            NotificationIcon::Error,
+            5.0f
+        )->show();
+        log::error("Failed to compile objectDrawing shader");
         return false;
+    }
 
     log::info("Compiled objectDrawing shader");
 
     cullingComputeShader = Shader::createCompute("objectCulling.comp", shaderMacroVariables);
-    if (!cullingComputeShader)
+    if (!cullingComputeShader) {
+        Notification::create(
+            "Bismuth couldn't compile its culling shader on this device.\n"
+            "The game keeps its normal renderer. See Bismuth.log.",
+            NotificationIcon::Error,
+            5.0f
+        )->show();
+        log::error("Failed to compile objectCulling shader");
         return false;
+    }
 
     log::info("Compiled objectCulling shader");
 
@@ -262,7 +312,15 @@ void Renderer::generateBatchNodes() {
 }
 
 void Renderer::terminate() {
-    glDeleteQueries(1, &timeElapsedQuery);
+#if BISMUTH_GL_ES
+    if (timeElapsedQuery && glDeleteQueries)
+        glDeleteQueries(1, &timeElapsedQuery);
+#else
+    if (timeElapsedQuery)
+        glDeleteQueries(1, &timeElapsedQuery);
+#endif
+    timeElapsedQuery = 0;
+
     currentRenderer = nullptr;
     log::info("Renderer terminated");
 }
@@ -429,8 +487,8 @@ float CAMERA_CULL_RECT_SCALE = 1.3;
 void Renderer::draw() {
     PROFILER_PUSH("Renderer::draw");
     
-    if (debugTextEnabled) {
-        glBeginQuery(GL_TIME_ELAPSED, timeElapsedQuery);
+    if (debugTextEnabled && bismuth::gpuTimingSupported()) {
+        bismuth::gpuTimerBegin(timeElapsedQuery);
     }
 
     /*
@@ -514,10 +572,9 @@ void Renderer::draw() {
 void Renderer::finish() {
     renderingTimer.stop();
 
-    if (debugTextEnabled) {
-        renderTime = 0;
-        glEndQuery(GL_TIME_ELAPSED);
-        glGetQueryObjecti64v(timeElapsedQuery, GL_QUERY_RESULT, &renderTime);
+    if (debugTextEnabled && bismuth::gpuTimingSupported()) {
+        bismuth::gpuTimerEnd();
+        renderTime = bismuth::gpuTimerResult(timeElapsedQuery);
     }
 
     if (debugText->isVisible())
@@ -537,7 +594,8 @@ void Renderer::updateDebugText() {
             auto screenSize = CCDirector::get()->getWinSizeInPixels();
 
             text += fmt::format("Bismuth renderer {}\n", Mod::get()->getVersion().toVString());
-            text += fmt::format("OpenGL {}\n", (const char*)glGetString(GL_VERSION));
+            text += fmt::format("{} ({})\n", bismuth::glCapabilities().versionString(),
+                (const char*)glGetString(GL_RENDERER));
             text += fmt::format("{}\n", (const char*)glGetString(GL_RENDERER));
             text += fmt::format("Window: {}x{}\n", screenSize.width, screenSize.height);
             text += fmt::format("GPU time: {}ms\n", (double)renderTime / 1000000.0);

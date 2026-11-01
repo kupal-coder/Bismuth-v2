@@ -1,5 +1,5 @@
 #include "Geode/cocos/CCDirector.h"
-#include "Geode/cocos/platform/win32/CCGL.h"
+#include "platform/GL.hpp"
 #include "Renderer.hpp"
 #include <Geode/binding/Standalones.hpp>
 #include <cstddef>

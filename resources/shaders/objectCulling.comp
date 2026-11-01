@@ -30,7 +30,7 @@ uint objectIndex;
 uint spriteType;
 vec2 objectPosition;
 vec2 vertexOffset;
-uint culledIndexBufferOutputIndex = 0;
+uint culledIndexBufferOutputIndex = 0u;
 
 //// HELPER FUNCTION PREDECLARATIONS ////
 bool isObjectOnScreen();
@@ -63,13 +63,13 @@ void processSprite(uint preCulledSpriteIndex) {
     //// APPLY LOCAL TRANSFORM ////
     mat2 objectLocalTransform = mat2(1.0);
 
-    if ((objectFlags & OBJECT_FLAG_IS_STATIC_OBJECT) == 0)
+    if ((objectFlags & OBJECT_FLAG_IS_STATIC_OBJECT) == 0u)
         objectLocalTransform = state.localTransform;
 
     if (object.rotationSpeed != 0.0) // TODO: Just supply rotation speed in radians instead
-        objectLocalTransform = rotationMatrix(-object.rotationSpeed * u_timer / 180 * PI) * objectLocalTransform;
+        objectLocalTransform = rotationMatrix(-object.rotationSpeed * u_timer / 180.0 * PI) * objectLocalTransform;
 
-    if ((objectFlags & OBJECT_FLAG_USES_AUDIO_SCALE) != 0)
+    if ((objectFlags & OBJECT_FLAG_USES_AUDIO_SCALE) != 0u)
         objectLocalTransform = scaleMatrix(calculateAudioScale()) * objectLocalTransform;
 
     //// CALCULATE OBJECT COLOR ////
@@ -99,19 +99,19 @@ void processSprite(uint preCulledSpriteIndex) {
     } else
         color = getColorChannelColor(colorChannel);
 
-    if (spriteType == SPRITE_TYPE_GLOW && (objectFlags & OBJECT_FLAG_SPECIAL_GLOW_COLOR) != 0)
+    if (spriteType == SPRITE_TYPE_GLOW && (objectFlags & OBJECT_FLAG_SPECIAL_GLOW_COLOR) != 0u)
         color = vec4(u_specialLightBGColor, 1.0);
 
-    if (state.pulseIndex != 0 && (spriteType == SPRITE_TYPE_BASE || spriteType == SPRITE_TYPE_DETAIL))
+    if (state.pulseIndex != 0u && (spriteType == SPRITE_TYPE_BASE || spriteType == SPRITE_TYPE_DETAIL))
         color = vec4(applyPulseEntries(color.rgb, state.pulseIndex, spriteType == SPRITE_TYPE_BASE), color.a);
 
-    if (spriteType == SPRITE_TYPE_BASE && (objectFlags & OBJECT_FLAG_HAS_BASE_HSV) != 0) {
+    if (spriteType == SPRITE_TYPE_BASE && (objectFlags & OBJECT_FLAG_HAS_BASE_HSV) != 0u) {
         color = applyHSV(object.baseHSV, color);
-    } else if (spriteType == SPRITE_TYPE_DETAIL && (objectFlags & OBJECT_FLAG_HAS_DETAIL_HSV) != 0) {
+    } else if (spriteType == SPRITE_TYPE_DETAIL && (objectFlags & OBJECT_FLAG_HAS_DETAIL_HSV) != 0u) {
         color = applyHSV(object.detailHSV, color);
     }
     
-    if ((objectFlags & OBJECT_FLAG_IS_INVISIBLE_BLOCK) != 0)
+    if ((objectFlags & OBJECT_FLAG_IS_INVISIBLE_BLOCK) != 0u)
         color = calculateInvisibleBlockColorAndOpacity(color);
 
     color.a *= state.opacity * object.opacity;
@@ -145,7 +145,7 @@ void main() {
         processSprite(i);
 
     //// WRITE THE DRAW COMMAND ////
-    u_drawCommands[workGroupIndex].count = (culledIndexBufferOutputIndex - workGroup.culledIndexBufferOutputIndex) * 3;
+    u_drawCommands[workGroupIndex].count = (culledIndexBufferOutputIndex - workGroup.culledIndexBufferOutputIndex) * 3u;
 }
 
 //// HELPER FUNCTIONS ////
@@ -165,14 +165,14 @@ bool isObjectOnScreen() {
 
 float calculateAudioScale() {
     float scale;
-    if ((objectFlags & OBJECT_FLAG_CUSTOM_AUDIO_SCALE) != 0) {
+    if ((objectFlags & OBJECT_FLAG_CUSTOM_AUDIO_SCALE) != 0u) {
         float minScale = u_objects[objectIndex].audioScaleMin;
         float maxScale = u_objects[objectIndex].audioScaleMax;
         scale = (u_audioScale - 0.1) * (maxScale - minScale) + minScale;
     } else
         scale = u_audioScale;
 
-    if ((objectFlags & OBJECT_FLAG_IS_ORB) != 0)
+    if ((objectFlags & OBJECT_FLAG_IS_ORB) != 0u)
         scale = min(scale + 0.3, 1.2);
     return scale;
 }
@@ -218,7 +218,7 @@ vec2 calculateInvisibleBlockOpacity() {
 }
 
 vec4 calculateInvisibleBlockColorAndOpacity(vec4 color) {
-    if ((u_gameStateFlags & GAME_STATE_IS_PLAYER_DEAD) != 0) {
+    if ((u_gameStateFlags & GAME_STATE_IS_PLAYER_DEAD) != 0u) {
         if (spriteType == SPRITE_TYPE_GLOW)
             return vec4(u_specialLightBGColor, color.a);
         return color;

@@ -8,24 +8,38 @@ public:
     inline GPUTimer(const char* name)
         : name(name)
     {
-        glGenQueries(1, &queryObject);
+        // Time elapsed queries only exist through EXT_disjoint_timer_query on
+        // most mobile GPUs, so only create the query when it can be used.
+        if (bismuth::gpuTimingSupported()) {
+#if BISMUTH_GL_ES
+            if (glGenQueries)
+#endif
+            glGenQueries(1, &queryObject);
+        }
+
         profiler::addTimer(this);
     }
 
     inline ~GPUTimer() {
-        glDeleteQueries(1, &queryObject);
+        if (queryObject) {
+#if BISMUTH_GL_ES
+            if (glDeleteQueries)
+#endif
+            glDeleteQueries(1, &queryObject);
+        }
+
         profiler::removeTimer(this);
     }
 
     inline void start() {
-        if (profiler::isTakingGPUTime)
-            glBeginQuery(GL_TIME_ELAPSED, queryObject);
+        if (profiler::isTakingGPUTime && queryObject)
+            bismuth::gpuTimerBegin(queryObject);
     }
 
     inline void stop() {
-        if (profiler::isTakingGPUTime) {
-            glEndQuery(GL_TIME_ELAPSED);
-            glGetQueryObjecti64v(queryObject, GL_QUERY_RESULT, &time);
+        if (profiler::isTakingGPUTime && queryObject) {
+            bismuth::gpuTimerEnd();
+            time = bismuth::gpuTimerResult(queryObject);
         }
     }
 
@@ -33,7 +47,7 @@ public:
     inline i64 getTime() const { return time; }
 
 private:
-    i64 time;
+    i64 time = 0;
     const char* name;
-    u32 queryObject;
+    u32 queryObject = 0;
 };

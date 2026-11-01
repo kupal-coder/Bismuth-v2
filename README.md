@@ -5,6 +5,15 @@ for maximum performance.
 
 Currently experimental
 
+## Platforms
+
+* **Windows** – the original target, OpenGL 4.3 required.
+* **Android** (32/64) – supported on devices with OpenGL ES 3.1; the mod falls
+  back to the game's own renderer everywhere else. See [MOBILE.md](MOBILE.md)
+  for requirements, what degrades and how it was ported.
+* **macOS / iOS** – build, but neither platform exposes the GL 4.3 / GLES 3.1
+  features the renderer needs, so Bismuth stays disabled there.
+
 <img src="logo.png" alt="Bismuth logo" width="100"/>
 
 ## License

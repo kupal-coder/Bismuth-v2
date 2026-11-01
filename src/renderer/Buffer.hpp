@@ -40,14 +40,24 @@ public:
         glBindBufferRange(GL_SHADER_STORAGE_BUFFER, binding, id, offset, size);
     }
 
-    void* map(i32 type);
+    enum class Access {
+        WriteOnly,
+        ReadWrite,
+    };
+
+    /*
+        Maps the whole buffer. Implemented with glMapBufferRange, which is the
+        only mapping API available on OpenGL ES (glMapBuffer does not exist
+        there).
+    */
+    void* map(Access access);
 
     inline void* mapWriteOnly() {
-        return map(GL_WRITE_ONLY);
+        return map(Access::WriteOnly);
     }
 
     inline void* mapReadWrite() {
-        return map(GL_READ_WRITE);
+        return map(Access::ReadWrite);
     }
 
     void unmap();

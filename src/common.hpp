@@ -1,12 +1,16 @@
 #pragma once
 
+// Geode first: it defines the platform macros the GL layer keys off.
+#include <Geode/Geode.hpp>
+
 #include "Geode/cocos/cocoa/CCGeometry.h"
+#include "platform/GL.hpp"
+#include "platform/GLRuntime.hpp"
 #include "gl.hpp"
 #include "ccTypes.h"
 #include "glm/fwd.hpp"
 #include <cstring>
 #include <glm/glm.hpp>
-#include <Geode/Geode.hpp>
 #include <chrono>
 #include <memory>
 #include <stdint.h>
@@ -45,7 +49,7 @@ using vec4 = glm::vec4;
 
 namespace fs = std::filesystem;
 
-// #define BISMUTH_ASSERT(COND) { if (!(COND)) geode::log::error("{}:{}: Assertion failed: {}", fs::path(__FILE__).filename(), __LINE__, #COND); }
+// #define BISMUTH_ASSERT(COND) { if (!(COND)) log::error("{}:{}: Assertion failed: {}", fs::path(__FILE__).filename(), __LINE__, #COND); }
 #define BISMUTH_ASSERT(COND)
 
 using usize = uintptr_t;

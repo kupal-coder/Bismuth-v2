@@ -17,7 +17,8 @@ STORAGE_BUFFER(VERTEX_BUFFER_BINDING) VertexBuffer {
 
 //// MAIN FUNCTION ////
 void main() {
-    uint vertexIndex = u_culledTriIndicies[gl_VertexID / 3] * 3 + gl_VertexID % 3;
+    uint triangleIndex = u_culledTriIndicies[gl_VertexID / 3];
+    uint vertexIndex = triangleIndex * 3u + uint(gl_VertexID % 3);
 
     vec2 positionOffset = u_verticies[vertexIndex].positionOffset;
     vec2 texCoord       = u_verticies[vertexIndex].texCoord;

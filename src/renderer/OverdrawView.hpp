@@ -10,7 +10,24 @@ public:
     OverdrawView(Renderer& renderer);
     ~OverdrawView();
 
+    /*
+        Reads back the stencil buffer, which OpenGL ES cannot do, so the overdraw
+        visualizer is desktop only.
+    */
+    static inline bool isSupported() {
+#if BISMUTH_GL_ES
+        return false;
+#else
+        return true;
+#endif
+    }
+
     inline void setEnabled(bool enabled) {
+        if (!isSupported()) {
+            this->enabled = false;
+            return;
+        }
+
         this->enabled = enabled;
         if (!enabled)
             stencilBuffer.clear();

@@ -1,10 +1,10 @@
-#define PULSE_FLAG_IS_BASE_ONLY   (1 << 26)
-#define PULSE_FLAG_IS_DETAIL_ONLY (1 << 27)
-#define PULSE_FLAG_IS_HSV         (1 << 28)
-#define PULSE_FLAG_IS_DYNAMIC_HSV (1 << 29)
-#define PULSE_FLAG_IS_ACTIVE      (1 << 30)
-#define PULSE_FLAG_GET_VALUE(F) (float((F) & 0xffff) / 65535.0f)
-#define PULSE_FLAG_GET_COLOR_CHANNEL(F) (((F) >> 16) & 0x3ff)
+#define PULSE_FLAG_IS_BASE_ONLY   (1u << 26)
+#define PULSE_FLAG_IS_DETAIL_ONLY (1u << 27)
+#define PULSE_FLAG_IS_HSV         (1u << 28)
+#define PULSE_FLAG_IS_DYNAMIC_HSV (1u << 29)
+#define PULSE_FLAG_IS_ACTIVE      (1u << 30)
+#define PULSE_FLAG_GET_VALUE(F) (float((F) & 0xffffu) / 65535.0f)
+#define PULSE_FLAG_GET_COLOR_CHANNEL(F) (((F) >> 16u) & 0x3ffu)
 
 struct PulseGroupEntry {
     uint flags;
@@ -22,14 +22,14 @@ vec3 applyPulseEntry(vec3 color, uint flags, uint colorOrHSV);
 vec3 applyPulseEntries(vec3 color, uint pulseIndex, bool isBaseColor) {
     while (true) {
         uint flags = u_pulseEntries[pulseIndex].flags;
-        if (flags == 0)
+        if (flags == 0u)
             break;
 
-        if ((flags & PULSE_FLAG_IS_BASE_ONLY) != 0 && !isBaseColor)
+        if (((flags & PULSE_FLAG_IS_BASE_ONLY) != 0u && !isBaseColor) ||
+            ((flags & PULSE_FLAG_IS_DETAIL_ONLY) != 0u && isBaseColor)) {
+            pulseIndex++;
             continue;
-
-        if ((flags & PULSE_FLAG_IS_DETAIL_ONLY) != 0 && isBaseColor)
-            continue;
+        }
 
         color = applyPulseEntry(color, flags, u_pulseEntries[pulseIndex].colorOrHSV);
         pulseIndex++;
@@ -44,18 +44,18 @@ vec3 applyPulseEntry(vec3 color, uint flags, uint colorOrHSV) {
     if (value <= 0.0f)
         return color;
 
-    if ((flags & PULSE_FLAG_IS_HSV) != 0) {
+    if ((flags & PULSE_FLAG_IS_HSV) != 0u) {
         uint colorChannel = PULSE_FLAG_GET_COLOR_CHANNEL(flags);
         HSVStruct hsv = readHSV(colorOrHSV);
 
         vec3 srcColor = color;
-        if (colorChannel != 0)
+        if (colorChannel != 0u)
             srcColor = getColorChannelColor(colorChannel).rgb;
 
         if (value == 1.0f)
             return applyHSVStruct(hsv, vec4(srcColor, 1.0)).rgb;
 
-        if ((flags & PULSE_FLAG_IS_DYNAMIC_HSV) != 0)
+        if ((flags & PULSE_FLAG_IS_DYNAMIC_HSV) != 0u)
             hsv = getMultipliedHSV(hsv, value);
 
         vec3 dstColor = applyHSVStruct(hsv, vec4(srcColor, 1.0)).rgb;
@@ -63,7 +63,7 @@ vec3 applyPulseEntry(vec3 color, uint flags, uint colorOrHSV) {
         return mix(color, dstColor, value);
     }
 
-    vec3 dstColor = unpackUnorm4x8(colorOrHSV).rgb;
+    vec3 dstColor = bismuthUnpackRGBA(colorOrHSV).rgb;
 
     return mix(color, dstColor, value);
 }

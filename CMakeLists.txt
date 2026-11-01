@@ -30,9 +30,6 @@ set(CMAKE_BUILD_TYPE RelWithDebInfo)
 # set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 # Libraries
-set(ENABLE_OPT 0)
-set(ENABLE_GLSLANG_BINARIES OFF)
-
 include(FetchContent)
 
 FetchContent_Declare(
@@ -40,17 +37,31 @@ FetchContent_Declare(
 	GIT_REPOSITORY	https://github.com/g-truc/glm.git
 	GIT_TAG 	0af55ccecd98d4e5a8d1fad7de25ba429d60e863
 )
-FetchContent_Declare(glslang GIT_REPOSITORY https://github.com/KhronosGroup/glslang.git GIT_TAG vulkan-sdk-1.4.335)
-FetchContent_Declare(
-	OpenCL-Headers
-	GIT_REPOSITORY	https://github.com/KhronosGroup/OpenCL-Headers.git
-	GIT_TAG 	    v2026.05.29
-)
+FetchContent_MakeAvailable(glm)
 
-FetchContent_MakeAvailable(glm glslang OpenCL-Headers)
-
-target_link_libraries(${PROJECT_NAME} glm::glm glslang::glslang OpenCL::Headers)
+target_link_libraries(${PROJECT_NAME} glm::glm)
 target_include_directories(${PROJECT_NAME} PRIVATE src)
+
+# glslang is used as the shader preprocessor on desktop. Mobile hand-preprocesses
+# the shaders (src/renderer/ShaderPreprocessor.cpp) and lets the driver compile
+# GLSL ES 3.10, so neither glslang nor the OpenCL headers are needed there.
+if (NOT ANDROID AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "iOS")
+	set(ENABLE_OPT 0)
+	set(ENABLE_GLSLANG_BINARIES OFF)
+
+	FetchContent_Declare(glslang GIT_REPOSITORY https://github.com/KhronosGroup/glslang.git GIT_TAG vulkan-sdk-1.4.335)
+	FetchContent_Declare(
+		OpenCL-Headers
+		GIT_REPOSITORY	https://github.com/KhronosGroup/OpenCL-Headers.git
+		GIT_TAG 	    v2026.05.29
+	)
+
+	FetchContent_MakeAvailable(glslang OpenCL-Headers)
+
+	target_link_libraries(${PROJECT_NAME} glslang::glslang OpenCL::Headers)
+else()
+	message(STATUS "Mobile build: skipping glslang and OpenCL")
+endif()
 
 # Other Geode stuff
 

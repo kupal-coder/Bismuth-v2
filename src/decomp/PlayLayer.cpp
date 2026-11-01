@@ -267,7 +267,7 @@ void decomp_PlayLayer::virtual_updateVisibility(float delta) {
         if (enterEffectType == -15 && !object->ignoreEnter()) {
             // applyCustomEnterEffect(object, isEnterEffectRight);
         } else {
-            // geode::log::info("enter: {}", objectEnterEffect);
+            // log::info("enter: {}", objectEnterEffect);
             applyEnterEffect(object, enterEffectType, isEnterEffectRight);
         }
 

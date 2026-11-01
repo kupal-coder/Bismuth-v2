@@ -298,13 +298,13 @@ class $modify(FnCCKeyboardDispatcher, cocos2d::CCKeyboardDispatcher) {
             CCARRAY_FOREACH(pl->m_objects, o) {
                 GameObject* obj = (GameObject*)o;
 
-                geode::log::info("OBJECT {}, {}", obj->m_objectID, obj->getAtlasIndex());
+                log::info("OBJECT {}, {}", obj->m_objectID, obj->getAtlasIndex());
 
                 CCObject* o2;
                 CCARRAY_FOREACH(obj->getChildren(), o2) {
                     cocos2d::CCSprite* sprite = (cocos2d::CCSprite*)o2;
 
-                    geode::log::info("SUBOBJECT {}", sprite->getAtlasIndex());
+                    log::info("SUBOBJECT {}", sprite->getAtlasIndex());
                 }
             }
         }

@@ -1,7 +1,7 @@
-#define SPRITE_TYPE_BASE   0
-#define SPRITE_TYPE_DETAIL 1
-#define SPRITE_TYPE_BLACK  2
-#define SPRITE_TYPE_GLOW   3
+#define SPRITE_TYPE_BASE   0u
+#define SPRITE_TYPE_DETAIL 1u
+#define SPRITE_TYPE_BLACK  2u
+#define SPRITE_TYPE_GLOW   3u
 
 /*
     This is the sprite info that is the input to the

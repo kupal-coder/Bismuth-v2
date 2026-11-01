@@ -28,8 +28,28 @@ static std::vector<void*> functionCallStack;
 
 static std::set<GPUTimer*> gpuTimers;
 
-// TODO: Make sure to not use queries if the drivers don't support it
-static bool supportsQueries = true;
+/*
+    Frame GPU time. Query objects have to come from glGenQueries (the old code
+    used the hard-coded name 50, which is invalid), and time elapsed queries do
+    not exist on every mobile GPU, so this is created lazily and skipped when the
+    driver does not support it.
+*/
+static u32 frameGpuQuery = 0;
+
+static bool ensureFrameGpuQuery() {
+    if (!bismuth::gpuTimingSupported())
+        return false;
+
+    if (!frameGpuQuery) {
+#if BISMUTH_GL_ES
+        if (!glGenQueries)
+            return false;
+#endif
+        glGenQueries(1, &frameGpuQuery);
+    }
+
+    return frameGpuQuery != 0;
+}
 
 DECLARE_HOTKEY(KEY_P, {
     takeSnapshotNextFrame = true;
@@ -44,8 +64,8 @@ class $modify(MyCCDisplayLinkDirector, cocos2d::CCDisplayLinkDirector) {
             profiler::isTakingGPUTime = false;//Renderer::get() != nullptr;
             takeSnapshotNextFrame = false;
             timeSpentInFunction.clear();
-            if (!profiler::isTakingGPUTime)
-                glBeginQuery(GL_TIME_ELAPSED, 50);
+            if (!profiler::isTakingGPUTime && ensureFrameGpuQuery())
+                bismuth::gpuTimerBegin(frameGpuQuery);
             processTime = getTime();
         }
 
@@ -57,9 +77,9 @@ class $modify(MyCCDisplayLinkDirector, cocos2d::CCDisplayLinkDirector) {
             processTime = getTime() - processTime;
 
             i64 gpuTime = 0;
-            if (!profiler::isTakingGPUTime) {
-                glEndQuery(GL_TIME_ELAPSED);
-                glGetQueryObjecti64v(50, GL_QUERY_RESULT, &gpuTime);
+            if (!profiler::isTakingGPUTime && frameGpuQuery) {
+                bismuth::gpuTimerEnd();
+                gpuTime = bismuth::gpuTimerResult(frameGpuQuery);
             }
             profiler::isTakingGPUTime = false;
 
