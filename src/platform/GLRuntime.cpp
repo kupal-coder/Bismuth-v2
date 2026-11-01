@@ -9,6 +9,8 @@
 #include <cctype>
 #include <cstring>
 
+using namespace geode::prelude;
+
 namespace bismuth {
 
 namespace {

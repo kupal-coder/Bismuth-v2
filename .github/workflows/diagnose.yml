@@ -23,7 +23,7 @@ jobs:
     name: ${{ matrix.target }}
     strategy:
       fail-fast: false
-      max-parallel: 1
+      max-parallel: 3
       matrix:
         include:
           - runner: ubuntu-latest

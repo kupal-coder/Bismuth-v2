@@ -1,7 +1,6 @@
 #include "OverdrawView.hpp"
 #include "Geode/cocos/CCDirector.h"
 #include "Geode/cocos/base_nodes/CCNode.h"
-#include <Geode/cocos/platform/CCEGLView.h>
 #include "platform/GL.hpp"
 #include "Geode/modify/Modify.hpp"
 #include "HotKey.hpp"
@@ -92,7 +91,14 @@ void OverdrawView::finish() {
     return;
 #else
 
+#if defined(GEODE_IS_WINDOWS)
     auto currentSize = CCDirector::get()->getOpenGLView()->getWindowedSize();
+#else
+    // getWindowedSize() only exists in cocos' win32 CCEGLView; every other
+    // platform (mac/iOS/Android) exposes the drawable size through the
+    // CCEGLViewProtocol base class instead.
+    auto currentSize = CCDirector::get()->getOpenGLView()->getFrameSize();
+#endif
     stencilBuffer.resize((u32)currentSize.width * (u32)currentSize.height);
 
     storeGLStates();

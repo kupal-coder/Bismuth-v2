@@ -1,6 +1,6 @@
 #include "WorkGroupScheduler.hpp"
 #include "Renderer.hpp"
-#include "../cl.hpp"
+#include "../platform/GPUInfo.hpp"
 
 void SortedObjectBatch::bindBuffers() {
     if (!haveBuffersBeenCreated) {

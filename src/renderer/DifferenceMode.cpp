@@ -11,7 +11,12 @@ DifferenceMode::~DifferenceMode() {
 }
 
 void DifferenceMode::drawSceneHook() {
+#if defined(GEODE_IS_WINDOWS)
     auto currentSize = CCDirector::get()->getOpenGLView()->getWindowedSize();
+#else
+    // getWindowedSize() only exists in cocos' win32 CCEGLView.
+    auto currentSize = CCDirector::get()->getOpenGLView()->getFrameSize();
+#endif
 
     if (lastSize != currentSize) {
         prepare(currentSize.width, currentSize.height);
