@@ -58,6 +58,7 @@ class $modify(RendererPlayLayer, PlayLayer) {
             }
 
             if (shouldCreateRenderer()) {
+                log::info("Level load: starting the renderer");
                 auto renderer = Renderer::create(this, m_objects);
                 if (renderer)
                     batchLayer->addChild(renderer, -100000);

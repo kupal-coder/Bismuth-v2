@@ -23,6 +23,22 @@
 
 using namespace geode::prelude;
 
+/*
+    Renderer::init() runs from inside PlayLayer::init() (via
+    setupHasCompleted -> resetLevel). Geode notifications are CCNode based and get
+    added to whatever scene is currently running, which is not something we want
+    to do in the middle of level initialisation on a phone we cannot test. Mobile
+    reports problems through the log (and through the alert shown at menu load),
+    desktop keeps its toasts.
+*/
+static void showRendererProblem(std::string const& message, NotificationIcon icon) {
+#if defined(GEODE_IS_ANDROID) || defined(GEODE_IS_IOS)
+    log::warn("{}", message);
+#else
+    Notification::create(message, icon, 5.0f)->show();
+#endif
+}
+
 static Renderer* currentRenderer;
 
 u32 convertToShaderHSV(const ccHSVValue& hsv) {
@@ -89,7 +105,7 @@ bool Renderer::init(PlayLayer* layer, CCArray* levelObjects) {
             message = "Your device doesn't support the required OpenGL 4.3\nPlease update your drivers";
         }
 
-        Notification::create(message, NotificationIcon::Error, 5.0f)->show();
+        showRendererProblem(message, NotificationIcon::Error);
         log::error(
             "Renderer unavailable: version '{}' (compute={}, ssbo={}, indirect={})",
             caps.version.empty() ? "<no context>" : caps.version,
@@ -205,12 +221,11 @@ bool Renderer::init(PlayLayer* layer, CCArray* levelObjects) {
     log::info("Compiling shaders...");
     shader = Shader::create("objectDrawing.vert", "objectDrawing.frag", shaderMacroVariables);
     if (!shader) {
-        Notification::create(
+        showRendererProblem(
             "Bismuth couldn't compile its shaders on this device.\n"
             "The game keeps its normal renderer. See Bismuth.log.",
-            NotificationIcon::Error,
-            5.0f
-        )->show();
+            NotificationIcon::Error
+        );
         log::error("Failed to compile objectDrawing shader");
         return false;
     }
@@ -219,12 +234,11 @@ bool Renderer::init(PlayLayer* layer, CCArray* levelObjects) {
 
     cullingComputeShader = Shader::createCompute("objectCulling.comp", shaderMacroVariables);
     if (!cullingComputeShader) {
-        Notification::create(
+        showRendererProblem(
             "Bismuth couldn't compile its culling shader on this device.\n"
             "The game keeps its normal renderer. See Bismuth.log.",
-            NotificationIcon::Error,
-            5.0f
-        )->show();
+            NotificationIcon::Error
+        );
         log::error("Failed to compile objectCulling shader");
         return false;
     }
@@ -285,11 +299,10 @@ bool Renderer::init(PlayLayer* layer, CCArray* levelObjects) {
     reset();
 
     if (ingameEnableDisable) {
-        Notification::create(
+        showRendererProblem(
             "Debug tools removes ALL optimizations!\nDisable it for better performance.",
-            NotificationIcon::Warning,
-            5.0f
-        )->show();
+            NotificationIcon::Warning
+        );
     }
 
     log::info("Renderer initialized");
