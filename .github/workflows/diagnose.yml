@@ -6,6 +6,9 @@ name: Diagnose build errors
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - '.ci/diagnose-trigger'
 
 permissions:
   contents: read
