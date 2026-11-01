@@ -39,6 +39,29 @@
 #  define BISMUTH_GL_HAS_ES31_HEADERS 0
 #endif
 
+#if BISMUTH_GL_ES
+/*
+    cocos2d (and Geode's per-platform CCGL.h) aliases a few ES3 names onto their
+    ES2 (OES) entry points, e.g.
+
+        #define glGenVertexArrays  glGenVertexArraysOES
+        #define glGenVertexArraysOES glGenVertexArraysOESEXT
+
+    This HAS to happen before <GLES3/gl31.h> is included: otherwise the aliases
+    rewrite the declarations in that header into redeclarations of cocos's
+    function pointer variables, which does not compile. Bismuth uses the core
+    entry points resolved by `bgl` instead, so the aliases are dropped.
+*/
+#  undef glGenVertexArrays
+#  undef glBindVertexArray
+#  undef glDeleteVertexArrays
+#  undef glMapBuffer
+#  undef glUnmapBuffer
+#  undef glClearDepth
+#  undef GL_WRITE_ONLY
+#  undef GL_DEPTH24_STENCIL8
+#endif
+
 #if BISMUTH_GL_DESKTOP
 #  include <Geode/cocos/platform/CCGL.h>
 #elif BISMUTH_GL_HAS_ES31_HEADERS
@@ -49,20 +72,8 @@
 #  include <OpenGLES/ES3/glext.h>
 #endif
 
-#if BISMUTH_GL_ES
-/*
-    cocos2d (and Geode's per-platform CCGL.h) alias a few ES3 names onto their
-    ES2 (OES) entry points. Bismuth goes through the core entry points that
-    `bgl` resolves instead, so drop those aliases before our code is parsed.
-*/
-#  undef glGenVertexArrays
-#  undef glBindVertexArray
-#  undef glDeleteVertexArrays
-#  undef glMapBuffer
-#  undef glUnmapBuffer
-#  undef glClearDepth
-#  undef GL_WRITE_ONLY
 
+#if BISMUTH_GL_ES
 /*
     Constants that only exist in ES 3.1+ headers (or in the KHR/EXT headers).
     The iOS SDK stops at ES 3.0, so define what is missing there as well so the

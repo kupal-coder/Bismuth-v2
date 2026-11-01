@@ -5,6 +5,9 @@
 #include "../cl.hpp"
 #endif
 
+#include <algorithm>
+#include <cctype>
+
 using namespace geode::prelude;
 
 isize estimateMobileGPUCoreCount() {

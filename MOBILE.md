@@ -26,8 +26,14 @@ Geometry Dash's Android build may ask EGL for an **ES 2.0 context even on phones
 that support 3.1**. The version string is not reliable in that case, so the port
 also compiles a minimal `#version 310 es` compute shader once at start-up
 (`bismuth::probeComputeSupport()`): if the driver accepts it, the renderer runs;
-if not, the mod falls back exactly like on an old device. `Bismuth.log` reports
-`compute=1 (probe=1)` when the probe is what enabled the renderer.
+if not, the mod falls back exactly like on an old device. The probe is only run
+when the context reports less than ES 3.1 (it costs a shader compile).
+`Bismuth.log` reports `compute=1 (probe=1)` when the probe is what enabled the
+renderer.
+
+`canRender()` only requires entry points that exist in ES 3.1 (verified against
+the official `gl31.h` prototypes), so a missing optional function can never be
+called through a null pointer.
 
 ## Falling back to the vanilla renderer
 
@@ -57,8 +63,18 @@ The mod never leaves a half-initialized renderer behind.
 * iOS includes `<OpenGLES/ES3/gl.h>` and keeps the same seam; the table stays
   empty.
 
-cocos2d aliases `glGenVertexArrays` to the OES variant on Android; those aliases
-are `#undef`ed so the core ES 3.0 entry points are used instead.
+cocos2d aliases `glGenVertexArrays` to the OES variant on Android, and Geode's
+Android `CCGL.h` aliases the OES name again to a function pointer variable:
+
+```c
+#define glGenVertexArrays   glGenVertexArraysOES
+#define glGenVertexArraysOES glGenVertexArraysOESEXT
+```
+
+Those aliases have to be `#undef`ed **before** `<GLES3/gl31.h>` is included,
+otherwise they rewrite the declarations inside that header into redeclarations of
+cocos's variables and the mod does not compile at all. The core ES 3.0 entry
+points resolved by `bgl` are used instead.
 
 ### Shaders
 
@@ -91,6 +107,7 @@ All eight shaders (vertex/fragment/compute) compile as both GLSL 460 and GLSL ES
 | one `glMultiDrawArraysIndirect` | `glMultiDrawArraysIndirect` when present, otherwise one `glDrawArraysIndirect` per work group (still GPU-driven) |
 | `glDispatchCompute` | same, followed by `glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT \| GL_COMMAND_BARRIER_BIT)` |
 | `glObjectLabel` | ES 3.2 only; routed through the table and ignored when missing |
+| `glShaderStorageBlockBinding` | **does not exist in OpenGL ES at all** (desktop GL 4.3+); not needed, ES uses `layout(binding = N)` + `glBindBufferBase` |
 | `GL_TIME_ELAPSED` queries | only when `GL_EXT_disjoint_timer_query` is present; otherwise all timings report 0 |
 | overdraw visualizer | disabled on mobile (reads back the stencil buffer, which ES cannot do) |
 | difference mode | works (RGBA/RGB FBOs are core ES) |

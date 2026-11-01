@@ -487,8 +487,13 @@ float CAMERA_CULL_RECT_SCALE = 1.3;
 void Renderer::draw() {
     PROFILER_PUSH("Renderer::draw");
     
-    if (debugTextEnabled && bismuth::gpuTimingSupported()) {
+    // timeElapsedQuery is 0 when the driver has no time-elapsed queries
+    // (common on mobile), and beginning a query with id 0 is a GL error.
+    // gpuTimerRunning keeps begin/end balanced if the overlay is toggled between
+    // draw() and finish().
+    if (debugTextEnabled && timeElapsedQuery && !gpuTimerRunning && bismuth::gpuTimingSupported()) {
         bismuth::gpuTimerBegin(timeElapsedQuery);
+        gpuTimerRunning = true;
     }
 
     /*
@@ -572,7 +577,8 @@ void Renderer::draw() {
 void Renderer::finish() {
     renderingTimer.stop();
 
-    if (debugTextEnabled && bismuth::gpuTimingSupported()) {
+    if (gpuTimerRunning) {
+        gpuTimerRunning = false;
         bismuth::gpuTimerEnd();
         renderTime = bismuth::gpuTimerResult(timeElapsedQuery);
     }
@@ -594,8 +600,9 @@ void Renderer::updateDebugText() {
             auto screenSize = CCDirector::get()->getWinSizeInPixels();
 
             text += fmt::format("Bismuth renderer {}\n", Mod::get()->getVersion().toVString());
-            text += fmt::format("{} ({})\n", bismuth::glCapabilities().versionString(),
-                (const char*)glGetString(GL_RENDERER));
+            const auto& caps = bismuth::glCapabilities();
+            text += fmt::format("{} ({})\n", caps.versionString(),
+                caps.renderer.empty() ? "unknown GPU" : caps.renderer);
             text += fmt::format("{}\n", (const char*)glGetString(GL_RENDERER));
             text += fmt::format("Window: {}x{}\n", screenSize.width, screenSize.height);
             text += fmt::format("GPU time: {}ms\n", (double)renderTime / 1000000.0);

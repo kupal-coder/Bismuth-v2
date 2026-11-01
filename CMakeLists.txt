@@ -45,7 +45,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE src)
 # glslang is used as the shader preprocessor on desktop. Mobile hand-preprocesses
 # the shaders (src/renderer/ShaderPreprocessor.cpp) and lets the driver compile
 # GLSL ES 3.10, so neither glslang nor the OpenCL headers are needed there.
-if (NOT ANDROID AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "iOS")
+if (NOT ANDROID AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Android" AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "iOS")
 	set(ENABLE_OPT 0)
 	set(ENABLE_GLSLANG_BINARIES OFF)
 

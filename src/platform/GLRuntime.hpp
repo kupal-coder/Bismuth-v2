@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GL.hpp"
+#include <cstdint>
 #include <string>
 
 namespace bismuth {

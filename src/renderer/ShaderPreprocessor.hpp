@@ -11,8 +11,14 @@
 
     It only has to do what the shaders in resources/shaders actually use:
       - `#include "file.h"` (recursively, with #pragma once semantics)
-      - stripping `#extension GL_ARB_shading_language_include`
+      - `#ifdef` / `#ifndef` / `#if` / `#elif` / `#else` / `#endif`, including
+        `defined(X)`, `!`, `&&`, `||` and integer conditions
+      - tracking `#define` / `#undef` so those conditions can be evaluated
+      - stripping `#extension GL_ARB_shading_language_include` and any `#version`
       - injecting the `#version` line, precision qualifiers and defines
+
+    Anything it cannot evaluate is left in place rather than dropped, so an
+    unsupported condition can never silently delete shader code.
 
     It deliberately has no dependency on Geode or the GL headers so it can be
     unit tested / validated against a GLSL validator outside of the game.
@@ -45,6 +51,10 @@ struct Options {
     Returns the fully expanded shader source (including the #version line), or
     nullopt when an include is missing / nesting is too deep. `error` receives a
     human readable message when it fails.
+*/
+/*
+    `stage` is currently only used for diagnostics; GLSL ES 3.10 has no
+    stage-specific preprocessing in these shaders.
 */
 std::optional<std::string> preprocess(
     const std::string& source,

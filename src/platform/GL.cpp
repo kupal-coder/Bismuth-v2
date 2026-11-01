@@ -105,6 +105,12 @@ bool loadGLFunctions() {
     loadAny(gl.BeginQueryTimeElapsed, {"glBeginQuery", "glBeginQueryEXT"});
     loadAny(gl.EndQueryTimeElapsed, {"glEndQuery", "glEndQueryEXT"});
 
+    /*
+        Everything the renderer needs, and only things that exist in OpenGL ES
+        3.1. glShaderStorageBlockBinding, glMultiDrawArraysIndirect, glObjectLabel
+        and glGetQueryObjectui64v are desktop-only / extension entry points and are
+        deliberately not required here.
+    */
     gl.computeReady =
         gl.GenVertexArrays &&
         gl.BindVertexArray &&
@@ -119,7 +125,6 @@ bool loadGLFunctions() {
         gl.DispatchCompute &&
         gl.MemoryBarrier &&
         gl.GetProgramResourceIndex &&
-        gl.ShaderStorageBlockBinding &&
         gl.DrawArraysIndirect;
 
     gl.loaded = true;

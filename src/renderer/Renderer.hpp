@@ -145,6 +145,9 @@ private:
     std::unordered_map<GameObject*, usize> objectSRBIndicies;
 
     u32 timeElapsedQuery = 0;
+    // Tracks whether a time-elapsed query is currently running, so the
+    // begin/end pair stays balanced when the debug overlay is toggled mid-frame.
+    bool gpuTimerRunning = false;
 
     glm::vec2 cameraCenterPos;
 

@@ -14,6 +14,7 @@
 #include <SPIRV/GlslangToSpv.h>
 #endif
 
+#include <deque>
 #include <optional>
 #include <memory>
 
@@ -41,6 +42,27 @@ void printErrorLog(std::string str) {
         log::error("    {}", start);
 }
 
+/*
+    Resolves `#include "..."` for the shaders. Geode flattens the mod's resource
+    directory, so a plain name is tried first and then the shader folders.
+*/
+static std::optional<std::string> readShaderInclude(const std::string& name) {
+    static const fs::path searchDirectories[] = {
+        "",
+        "headers",
+        fs::path("shaders") / "headers",
+        "shaders",
+    };
+
+    for (const auto& directory : searchDirectories) {
+        auto content = readResourceFile(directory / name);
+        if (content)
+            return content;
+    }
+
+    return std::nullopt;
+}
+
 #if BISMUTH_GL_DESKTOP
 
 /*
@@ -59,7 +81,7 @@ public:
         const char* includerName,
         size_t inclusionDepth
     ) override {
-        auto res = readResourceFile(headerName);
+        auto res = readShaderInclude(headerName);
         if (!res) {
             log::error("could not include header file at: {}", headerName);
             return nullptr;
@@ -75,7 +97,12 @@ public:
 
 private:
     std::vector<IncludeResult*> results;
-    std::vector<std::string> headerSources;
+    /*
+        deque, not vector: glslang keeps the IncludeResult pointers (and the text
+        they point at) alive until parsing finishes, and a vector reallocation
+        would dangle every earlier c_str().
+    */
+    std::deque<std::string> headerSources;
 };
 
 static TBuiltInResource getDefaultResources();
@@ -186,27 +213,6 @@ static UPtr<glslang::TShader> compileShader(EShLanguage stage, std::string code,
 }
 
 #endif // BISMUTH_GL_DESKTOP
-
-/*
-    Resolves `#include "..."` for the shaders. Geode flattens the mod's resource
-    directory, so a plain name is tried first and then the shader folders.
-*/
-static std::optional<std::string> readShaderInclude(const std::string& name) {
-    static const fs::path searchDirectories[] = {
-        "",
-        "headers",
-        fs::path("shaders") / "headers",
-        "shaders",
-    };
-
-    for (const auto& directory : searchDirectories) {
-        auto content = readResourceFile(directory / name);
-        if (content)
-            return content;
-    }
-
-    return std::nullopt;
-}
 
 #if BISMUTH_GL_DESKTOP
 
@@ -507,10 +513,29 @@ UPtr<Shader> Shader::createCompute(const fs::path& path, std::map<std::string, s
 }
 
 static void bindBufferToShader(u32 program, u32 index, u32 binding, bool ssbo) {
-    if (ssbo)
+    if (ssbo) {
+        /*
+            glShaderStorageBlockBinding is desktop GL 4.3+ only, it does not exist
+            in OpenGL ES. ES uses the `layout(binding = N)` qualifier in the
+            shader plus glBindBufferBase, which is what the renderer relies on, so
+            this path is never needed on mobile.
+        */
+#if BISMUTH_GL_ES
+        if (bgl::gl.ShaderStorageBlockBinding)
+            bgl::gl.ShaderStorageBlockBinding(program, index, binding);
+        else
+            log::error("glShaderStorageBlockBinding is not available on this platform");
+#else
+        if (!glShaderStorageBlockBinding) {
+            log::error("glShaderStorageBlockBinding is not available");
+            return;
+        }
+
         glShaderStorageBlockBinding(program, index, binding);
-    else
+#endif
+    } else {
         glUniformBlockBinding(program, index, binding);
+    }
 }
 
 u32 Shader::getBufferBinding(const char* name, bool ssbo) {

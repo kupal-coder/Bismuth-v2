@@ -23,20 +23,23 @@ bool isOpenGLAtLeastVersion(u32 major, u32 minor) {
     return bismuth::glCapabilities().isAtLeast((int)major, (int)minor);
 }
 
-using ProcGlObjectLabel = void(*)(GLenum, GLuint, GLsizei, const char*);
-
-ProcGlObjectLabel glObjectLabelProc = nullptr;
-
 void glObjectLabel(GLenum id, GLuint name, GLsizei length, const char* label) {
 #if BISMUTH_GL_ES
-    // KHR_debug; a no-op on drivers that do not expose debug annotations.
+    // KHR_debug, resolved at runtime; a no-op on drivers without it.
     if (bgl::gl.ObjectLabel)
         bgl::gl.ObjectLabel(id, name, length, label);
-#elif defined(GEODE_IS_WINDOWS)
-    if (!glObjectLabelProc)
-        glObjectLabelProc = (ProcGlObjectLabel)wglGetProcAddress("glObjectLabel");
-    if (glObjectLabelProc)
-        glObjectLabelProc(id, name, length, label);
+#else
+    /*
+        Desktop debug labels stay disabled. The old code looked the entry point up
+        with wglGetProcAddress behind a macro that was never defined, so it never
+        ran; enabling it now would be a desktop behaviour change for a purely
+        cosmetic feature (and some Windows drivers return bogus pointers for
+        unsupported functions).
+    */
+    (void)id;
+    (void)name;
+    (void)length;
+    (void)label;
 #endif
 }
 
@@ -62,6 +65,11 @@ void drawFullscreenQuad() {
     if (!fullscreenQuadVAO) {
         if (!fullscreenQuadVBO)
             fullscreenQuadVBO = Buffer::createStaticDraw("Fullscreen quad buffer", fullscreenQuad, sizeof(fullscreenQuad));
+
+        // Buffer creation can fail (e.g. out of VRAM); binding a null buffer
+        // would dereference it.
+        if (!fullscreenQuadVBO)
+            return;
 
         glGenVertexArrays(1, &fullscreenQuadVAO);
         glBindVertexArray(fullscreenQuadVAO);

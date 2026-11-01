@@ -131,17 +131,33 @@ void detectGLCapabilities() {
     std::string extensions = queryExtensionString();
 
 #if BISMUTH_GL_ES
-    caps.vertexArrays  = bgl::gl.GenVertexArrays && bgl::gl.BindVertexArray;
-    caps.mapBufferRange = bgl::gl.MapBufferRange && bgl::gl.UnmapBuffer;
+    /*
+        These flags cover every entry point the renderer calls unconditionally, so
+        a null pointer can never be reached once canRender() is true.
+    */
+    caps.vertexArrays  = bgl::gl.GenVertexArrays &&
+                         bgl::gl.BindVertexArray &&
+                         bgl::gl.DeleteVertexArrays &&
+                         bgl::gl.VertexAttribIPointer;
+    caps.mapBufferRange = bgl::gl.MapBufferRange &&
+                          bgl::gl.UnmapBuffer &&
+                          bgl::gl.FlushMappedBufferRange;
     caps.uniformBuffers = bgl::gl.GetUniformBlockIndex != nullptr;
 
+    /*
+        Only entry points that actually exist in OpenGL ES 3.1. Note that
+        glShaderStorageBlockBinding does NOT exist on ES (it is desktop GL 4.3+):
+        ES relies on the `layout(binding = N)` qualifier plus glBindBufferBase,
+        which is exactly what the shaders and the renderer already do.
+    */
     bool computeEntryPoints =
         bgl::gl.DispatchCompute &&
         bgl::gl.MemoryBarrier &&
-        bgl::gl.GetProgramResourceIndex &&
-        bgl::gl.ShaderStorageBlockBinding;
+        bgl::gl.GetProgramResourceIndex;
 
-    caps.computeProbe = computeEntryPoints && probeComputeSupport();
+    // Only worth compiling the probe shader when the context does not already
+    // claim ES 3.1 (it costs a shader compile).
+    caps.computeProbe = !caps.isAtLeast(3, 1) && computeEntryPoints && probeComputeSupport();
 
     /*
         The version string is authoritative when the context really is ES 3.1+.
@@ -151,7 +167,10 @@ void detectGLCapabilities() {
     */
     caps.computeShaders = computeEntryPoints &&
                           (caps.isAtLeast(3, 1) || caps.computeProbe);
-    caps.storageBuffers = caps.computeShaders;
+    // SSBO binding itself needs the buffer base/range entry points.
+    caps.storageBuffers = caps.computeShaders &&
+                          bgl::gl.BindBufferBase &&
+                          bgl::gl.BindBufferRange;
     caps.indirectDraw   = caps.computeShaders && bgl::gl.DrawArraysIndirect;
     caps.multiDrawIndirect = bgl::gl.MultiDrawArraysIndirect != nullptr;
     caps.gpuTimers      = hasExtension(extensions, "GL_EXT_disjoint_timer_query") &&
@@ -197,7 +216,7 @@ void detectGLCapabilities() {
 
 bool probeComputeSupport() {
 #if BISMUTH_GL_ES
-    if (!bgl::gl.DispatchCompute || !bgl::gl.ShaderStorageBlockBinding)
+    if (!bgl::gl.DispatchCompute || !bgl::gl.MemoryBarrier)
         return false;
 
     static const char* probeSource =

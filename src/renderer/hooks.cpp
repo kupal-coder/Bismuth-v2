@@ -321,7 +321,8 @@ public:
 
         if (!caps.canRender()) {
             std::string version = caps.version;
-            std::transform(version.begin(), version.end(), version.begin(), [](char ch) { return std::tolower(ch); });
+            std::transform(version.begin(), version.end(), version.begin(),
+                [](unsigned char ch) { return (char)std::tolower(ch); });
 
             if (version.find("reviangle") != std::string::npos) {
                 FLAlertLayer::create(
