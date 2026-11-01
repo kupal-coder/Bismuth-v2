@@ -1,8 +1,9 @@
 name: Diagnose build errors
 
 # Manual-only helper: runs the same configure/build commands as the official
-# `geode-sdk/build-geode-mod` action, but keeps the output and publishes the
-# compiler errors as an issue so they can be read without downloading logs.
+# `geode-sdk/build-geode-mod` action, but keeps the output and commits the
+# filtered compiler errors to `.ci/reports/` so they can be read without
+# downloading Actions logs (which are not reachable from every environment).
 
 on:
   workflow_dispatch:
@@ -11,25 +12,29 @@ on:
       - '.ci/diagnose-trigger'
 
 permissions:
-  contents: read
-  issues: write
+  contents: write
+
+concurrency:
+  group: diagnose-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   diagnose:
     name: ${{ matrix.target }}
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         include:
-          - runner: windows-latest
-            target: Win64
-            target_id: win
           - runner: ubuntu-latest
             target: Android64
             target_id: android64
           - runner: ubuntu-latest
             target: Android32
             target_id: android32
+          - runner: windows-latest
+            target: Win64
+            target_id: win
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -76,42 +81,37 @@ jobs:
             -G Ninja $EXTRA -DGEODE_DONT_INSTALL_MODS=ON -DGEODE_TARGET_PLATFORM=${{ matrix.target }} \
             2>&1 | tee configure.log
           cmake --build build --config Release --parallel -- -k 0 2>&1 | tee build.log
-          echo "BUILD_EXIT=$?" >> $GITHUB_ENV
 
-      - name: Publish errors
+      - name: Publish report
         if: always()
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          OUT="${{ github.workspace }}/report.md"
+          mkdir -p .ci/reports
+          OUT=".ci/reports/${{ matrix.target_id }}.log"
           {
-            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} (${{ matrix.target }})"
-            echo
+            echo "== ${{ matrix.target }} =="
+            echo "run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             if [ -f build.log ]; then
-              echo '### build.log errors'
-              echo '```'
-              grep -nE "error:|Error |error C|error LNK|undefined reference|fatal error" build.log | head -n 120 || true
-              echo '```'
-              echo '### build.log context'
-              echo '```'
-              grep -nE -B2 -A6 "error:" build.log | head -n 700 || true
-              echo '```'
-              echo '### build.log tail'
-              echo '```'
-              tail -n 60 build.log || true
-              echo '```'
+              echo "== errors =="
+              grep -nE -B3 -A8 "error:|error C|error LNK|undefined reference|fatal error|ninja: build stopped" build.log | head -n 3000 || true
+              echo "== first failing commands =="
+              grep -nE -A2 "FAILED:" build.log | head -n 200 || true
+              echo "== tail =="
+              tail -n 40 build.log || true
             else
-              echo 'no build.log'
-            fi
-            if [ -f configure.log ]; then
-              echo '### configure.log tail'
-              echo '```'
-              tail -n 60 configure.log || true
-              echo '```'
+              echo "== configure.log tail =="
+              tail -n 80 configure.log 2>/dev/null || echo "no logs"
             fi
           } > "$OUT" 2>&1 || true
-          head -c 60000 "$OUT" > report_trunc.md || true
-          gh api "repos/${{ github.repository }}/issues" \
-            -f title="CI build errors: ${{ matrix.target }} (run ${{ github.run_id }})" \
-            -F body=@report_trunc.md || true
+          wc -c "$OUT" || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f "$OUT"
+          git diff --cached --quiet && exit 0
+          git commit -q -m "ci: build report for ${{ matrix.target_id }} [skip ci]"
+          for i in 1 2 3 4 5; do
+            if git push -q origin "HEAD:${{ github.ref_name }}"; then exit 0; fi
+            sleep 7
+            git pull --rebase -q origin "${{ github.ref_name }}" || true
+          done
+          exit 0
